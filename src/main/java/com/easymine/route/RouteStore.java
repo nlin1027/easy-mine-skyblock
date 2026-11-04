@@ -36,6 +36,7 @@ import net.fabricmc.loader.api.FabricLoader;
  *
  * <pre>{@code
  * { "version": 1, "name": "Mithril lane", "createdAt": "...", "lengthTicks": 240,
+ *   "startYaw": 90.0, "startPitch": 12.5,   (optional: camera angle at the start; playback restores it every loop)
  *   "events": [ { "tick": 0, "type": "key", "code": 87, "down": true },
  *               { "tick": 3, "type": "look", "yaw": 1.5, "pitch": -0.25 } ] }
  * }</pre>
@@ -77,7 +78,8 @@ public final class RouteStore {
 		return routes;
 	}
 
-	public static Route saveNew(String name, Instant createdAt, int lengthTicks, List<Route.Event> events) throws IOException {
+	public static Route saveNew(String name, Instant createdAt, int lengthTicks, float startYaw, float startPitch,
+			List<Route.Event> events) throws IOException {
 		Path dir = directory();
 		Files.createDirectories(dir);
 		String baseId = ID_FORMAT.format(createdAt);
@@ -85,7 +87,7 @@ public final class RouteStore {
 		for (int i = 2; Files.exists(dir.resolve(id + EXTENSION)); i++) {
 			id = baseId + "_" + i;
 		}
-		Route route = new Route(id, name.strip(), createdAt, lengthTicks, events);
+		Route route = new Route(id, name.strip(), createdAt, lengthTicks, startYaw, startPitch, events);
 		write(route);
 		return route;
 	}
@@ -125,6 +127,10 @@ public final class RouteStore {
 		json.addProperty("name", route.name());
 		json.addProperty("createdAt", route.createdAt().toString());
 		json.addProperty("lengthTicks", route.lengthTicks());
+		if (route.hasStartLook()) {
+			json.addProperty("startYaw", route.startYaw());
+			json.addProperty("startPitch", route.startPitch());
+		}
 
 		JsonArray events = new JsonArray();
 		for (Route.Event event : route.events()) {
@@ -184,6 +190,8 @@ public final class RouteStore {
 			});
 		}
 		events.sort(Comparator.comparingInt(Route.Event::tick));
-		return new Route(id, json.get("name").getAsString(), createdAt, lengthTicks, events);
+		float startYaw = json.has("startYaw") ? json.get("startYaw").getAsFloat() : Float.NaN;
+		float startPitch = json.has("startPitch") ? json.get("startPitch").getAsFloat() : Float.NaN;
+		return new Route(id, json.get("name").getAsString(), createdAt, lengthTicks, startYaw, startPitch, events);
 	}
 }

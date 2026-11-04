@@ -11,13 +11,21 @@ import java.util.Locale;
  * @param name        display name
  * @param createdAt   when recording started
  * @param lengthTicks how long the route lasts
+ * @param startYaw    exact camera yaw when recording began ({@link Float#NaN} for routes saved before this was stored)
+ * @param startPitch  exact camera pitch when recording began ({@link Float#NaN} if unknown)
  * @param events      in tick order
  */
-public record Route(String id, String name, Instant createdAt, int lengthTicks, List<Event> events) {
+public record Route(String id, String name, Instant createdAt, int lengthTicks, float startYaw, float startPitch,
+		List<Event> events) {
 	public static final int TICKS_PER_SECOND = 20;
 
 	public Route {
 		events = List.copyOf(events);
+	}
+
+	/** False for routes recorded before the starting camera angle was saved; playback then keeps the current angle. */
+	public boolean hasStartLook() {
+		return !Float.isNaN(this.startYaw) && !Float.isNaN(this.startPitch);
 	}
 
 	public enum Type {

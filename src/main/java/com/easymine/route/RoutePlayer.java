@@ -102,6 +102,11 @@ public final class RoutePlayer {
 				}
 			}
 		}
+		if (stepTick == 0 && playing.hasStartLook()) {
+			// Start of every loop: turn back to exactly where the recording began.
+			expectedYaw = playing.startYaw();
+			expectedPitch = Mth.clamp(playing.startPitch(), -90.0f, 90.0f);
+		}
 		player.setYRot(expectedYaw);
 		player.setXRot(expectedPitch);
 

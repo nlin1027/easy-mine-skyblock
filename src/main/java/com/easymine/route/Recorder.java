@@ -57,6 +57,8 @@ public final class Recorder {
 	private static float lastYaw;
 	private static float lastPitch;
 	private static boolean haveLook;
+	private static float startYaw;
+	private static float startPitch;
 
 	private static String activeName = "";
 	private static String draftName = "";
@@ -204,7 +206,12 @@ public final class Recorder {
 		events.clear();
 		java.util.Arrays.fill(keyHeld, false);
 		java.util.Arrays.fill(mouseHeld, false);
-		haveLook = false;
+		// Remember the exact camera angle so every playback loop can turn back to it.
+		startYaw = minecraft.player.getYRot();
+		startPitch = minecraft.player.getXRot();
+		lastYaw = startYaw;
+		lastPitch = startPitch;
+		haveLook = true;
 		lastResult = null;
 
 		minecraft.player.sendOverlayMessage(Component.translatable("easymine.record.overlay.started", activeName, toggleKeyName()));
@@ -263,7 +270,7 @@ public final class Recorder {
 			draftName = activeName;
 		} else {
 			try {
-				saved = RouteStore.saveNew(activeName, startedAt, tick, events);
+				saved = RouteStore.saveNew(activeName, startedAt, tick, startYaw, startPitch, events);
 				lastResult = Component.translatable("easymine.record.result.saved",
 						saved.name(), Route.formatDuration(saved.lengthTicks()));
 			} catch (IOException e) {
