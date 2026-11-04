@@ -152,7 +152,7 @@ public final class Recorder {
 			}
 		}
 		for (int button = 0; button < MOUSE_BUTTONS; button++) {
-			boolean down = GLFW.glfwGetMouseButton(window, button) == GLFW.GLFW_PRESS;
+			boolean down = GLFW.glfwGetMouseButton(window, button) == GLFW.GLFW_PRESS && !isStopMouseButton(button);
 			if (down != mouseHeld[button]) {
 				mouseHeld[button] = down;
 				events.add(Route.Event.mouse(tick, button, down));
@@ -166,9 +166,19 @@ public final class Recorder {
 			return true;
 		}
 		InputConstants.Key key = InputConstants.Type.KEYSYM.getOrCreate(code);
-		return (toggleKey != null && toggleKey.matches(key))
+		return isStopKey(key)
 				|| minecraft.options.keyChat.matches(key)
 				|| minecraft.options.keyCommand.matches(key);
+	}
+
+	/** True if {@code key} is whatever the player currently has the start/stop recording key bound to. */
+	private static boolean isStopKey(InputConstants.Key key) {
+		return toggleKey != null && !toggleKey.isUnbound() && toggleKey.saveString().equals(key.getName());
+	}
+
+	/** The stop key can be rebound to a mouse button, which must not be recorded either. */
+	private static boolean isStopMouseButton(int button) {
+		return isStopKey(InputConstants.Type.MOUSE.getOrCreate(button));
 	}
 
 	/** @return {@code null} on success, otherwise the reason nothing started */
