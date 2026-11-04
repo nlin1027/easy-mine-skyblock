@@ -81,8 +81,12 @@ public final class RoutePlayer {
 		}
 		if (!active) {
 			active = true;
-			expectedYaw = player.getYRot();
-			expectedPitch = player.getXRot();
+			if (stepTick == 0) {
+				expectedYaw = player.getYRot();
+				expectedPitch = player.getXRot();
+			}
+			// Otherwise resuming mid-route: expectedYaw/Pitch still hold the angle saved when left click was
+			// released, and advance() snaps the camera back to it.
 		}
 
 		advance(minecraft, player);
