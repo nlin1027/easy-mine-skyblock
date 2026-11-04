@@ -1,0 +1,65 @@
+# gradle
+
+.gradle/
+.kotlin/
+build/
+out/
+classes/
+local.properties
+# keep the wrapper jar so ./gradlew works on a fresh clone
+!gradle/wrapper/gradle-wrapper.jar
+
+# eclipse
+
+*.launch
+
+# idea
+
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# vscode
+
+.settings/
+.vscode/
+bin/
+.classpath
+.project
+.factorypath
+
+# macos
+
+*.DS_Store
+._*
+
+# windows
+
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# fabric
+
+run/
+logs/
+crash-reports/
+
+# java
+
+hs_err_*.log
+replay_*.log
+*.hprof
+*.jfr
+
+# claude code (agent worktrees and personal settings)
+
+.claude/worktrees/
+.claude/settings.local.json
+
+# secrets
+
+.env
+*.env
