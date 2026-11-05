@@ -33,22 +33,32 @@ public record Route(String id, String name, Instant createdAt, int lengthTicks, 
 		KEY,
 		/** A mouse button going down or up. */
 		MOUSE,
-		/** The camera turning: yaw/pitch are the change since the previous tick. */
+		/** The camera turning: yaw/pitch are the change since the previous camera sample (several per tick). */
 		LOOK
 	}
 
 	/** One thing that happened on a tick. code/down apply to KEY and MOUSE, yaw/pitch to LOOK. */
-	public record Event(int tick, Type type, int code, boolean down, float yaw, float pitch) {
+	public record Event(int tick, float frac, Type type, int code, boolean down, float yaw, float pitch) {
 		public static Event key(int tick, int code, boolean down) {
-			return new Event(tick, Type.KEY, code, down, 0, 0);
+			return new Event(tick, 0, Type.KEY, code, down, 0, 0);
 		}
 
 		public static Event mouse(int tick, int button, boolean down) {
-			return new Event(tick, Type.MOUSE, button, down, 0, 0);
+			return new Event(tick, 0, Type.MOUSE, button, down, 0, 0);
 		}
 
 		public static Event look(int tick, float yaw, float pitch) {
-			return new Event(tick, Type.LOOK, 0, false, yaw, pitch);
+			return look(tick, 0, yaw, pitch);
+		}
+
+		/** A camera sample part-way through a tick: {@code frac} is in [0, 1). */
+		public static Event look(int tick, float frac, float yaw, float pitch) {
+			return new Event(tick, frac, Type.LOOK, 0, false, yaw, pitch);
+		}
+
+		/** Position on the timeline in ticks, including the sub-tick fraction used by camera samples. */
+		public float time() {
+			return this.tick + this.frac;
 		}
 	}
 

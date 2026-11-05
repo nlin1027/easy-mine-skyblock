@@ -17,9 +17,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 
 import com.easymine.EasyMineClient;
 
@@ -46,6 +48,10 @@ public final class Recorder {
 	private static final int[] KEY_CODES = buildKeyCodes();
 	private static final int MOUSE_BUTTONS = 8;
 
+	/** Camera samples per game tick. Vanilla ticks at 20/s; 1.75 samples per tick is 35/s, 75% more than one per tick. */
+	public static final float LOOK_SAMPLES_PER_TICK = 1.75f;
+	private static final float LOOK_SAMPLE_GAP = 1.0f / LOOK_SAMPLES_PER_TICK;
+
 	private static @Nullable KeyMapping toggleKey;
 
 	private static boolean recording;
@@ -57,6 +63,8 @@ public final class Recorder {
 	private static float lastYaw;
 	private static float lastPitch;
 	private static boolean haveLook;
+	/** Timeline position of the last camera sample. */
+	private static float lastLookTime;
 	private static float startYaw;
 	private static float startPitch;
 
@@ -85,11 +93,12 @@ public final class Recorder {
 		toggleKey = KeyMappingHelper.registerKeyMapping(
 				new KeyMapping("key.easymine.toggle_recording", GLFW.GLFW_KEY_F8, CATEGORY));
 		ClientTickEvents.START_CLIENT_TICK.register(Recorder::onStartTick);
+		LevelRenderEvents.START_MAIN.register(context -> onFrame(Minecraft.getInstance()));
 	}
 
 	/** True for this mod's own bindings, which playback leaves alone. */
 	public static boolean isOwnMapping(KeyMapping mapping) {
-		return mapping == toggleKey;
+		return mapping == toggleKey || RoutePlayer.isOwnMapping(mapping);
 	}
 
 	private static void onStartTick(Minecraft minecraft) {
@@ -141,7 +150,36 @@ public final class Recorder {
 		}
 		lastYaw = yaw;
 		lastPitch = pitch;
+		lastLookTime = tick;
 		haveLook = true;
+	}
+
+	/**
+	 * Extra camera samples between ticks, taken once per rendered frame whenever enough of a tick has passed since the last
+	 * sample. {@code tick} was already advanced for the tick that just ran, so the frame sits at {@code tick - 1 + partial}.
+	 */
+	private static void onFrame(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		if (!recording || player == null || !haveLook || tick == 0
+				|| minecraft.gui.screen() != null || minecraft.isPaused()) {
+			return;
+		}
+		float partial = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+		float time = tick - 1 + Mth.clamp(partial, 0.0f, 0.999f);
+		if (time - lastLookTime < LOOK_SAMPLE_GAP) {
+			return;
+		}
+		float yaw = player.getYRot();
+		float pitch = player.getXRot();
+		float dYaw = yaw - lastYaw;
+		float dPitch = pitch - lastPitch;
+		if (Math.abs(dYaw) > 1e-4f || Math.abs(dPitch) > 1e-4f) {
+			int whole = (int) Math.floor(time);
+			events.add(Route.Event.look(whole, time - whole, dYaw, dPitch));
+		}
+		lastYaw = yaw;
+		lastPitch = pitch;
+		lastLookTime = time;
 	}
 
 	private static void sampleInput(Minecraft minecraft) {
@@ -169,6 +207,7 @@ public final class Recorder {
 		}
 		InputConstants.Key key = InputConstants.Type.KEYSYM.getOrCreate(code);
 		return isStopKey(key)
+				|| RoutePlayer.isPlaybackKey(key)
 				|| minecraft.options.keyChat.matches(key)
 				|| minecraft.options.keyCommand.matches(key);
 	}
@@ -180,7 +219,8 @@ public final class Recorder {
 
 	/** The stop key can be rebound to a mouse button, which must not be recorded either. */
 	private static boolean isStopMouseButton(int button) {
-		return isStopKey(InputConstants.Type.MOUSE.getOrCreate(button));
+		InputConstants.Key key = InputConstants.Type.MOUSE.getOrCreate(button);
+		return isStopKey(key) || RoutePlayer.isPlaybackKey(key);
 	}
 
 	/** @return {@code null} on success, otherwise the reason nothing started */
@@ -211,6 +251,7 @@ public final class Recorder {
 		startPitch = minecraft.player.getXRot();
 		lastYaw = startYaw;
 		lastPitch = startPitch;
+		lastLookTime = 0;
 		haveLook = true;
 		lastResult = null;
 

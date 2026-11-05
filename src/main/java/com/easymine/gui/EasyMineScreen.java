@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
+import com.easymine.Settings;
 import com.easymine.route.Recorder;
 import com.easymine.route.Route;
 import com.easymine.route.RoutePlayer;
@@ -26,7 +27,7 @@ public final class EasyMineScreen extends Screen {
 	private static final int PANEL_WIDTH = 232;
 	private static final int ROWS_PER_PAGE = 5;
 	private static final int ROW_HEIGHT = 22;
-	private static final int PANEL_HEIGHT = 236;
+	private static final int PANEL_HEIGHT = 262;
 
 	private static int page;
 
@@ -113,6 +114,24 @@ public final class EasyMineScreen extends Screen {
 			RoutePlayer.setRepeat(!RoutePlayer.repeat());
 			button.setMessage(repeatLabel());
 		}).bounds(x + 52, footerY, inner - 52, 20).build());
+		addRenderableWidget(Button.builder(playModeLabel(), button -> {
+			Settings.setPlayMode(Settings.playMode().next());
+			RoutePlayer.onPlayModeChanged();
+			button.setMessage(playModeLabel());
+		}).bounds(x, footerY + 24, inner, 20).build());
+	}
+
+	private static Component playModeLabel() {
+		return Component.translatable("easymine.screen.play_mode",
+				Component.translatable("easymine.screen.play_mode." + Settings.playMode().name().toLowerCase(java.util.Locale.ROOT)));
+	}
+
+	private static Component hintLabel() {
+		return switch (Settings.playMode()) {
+			case HOLD -> Component.translatable("easymine.screen.hint.hold");
+			case KEYBIND -> Component.translatable("easymine.screen.hint.keybind", RoutePlayer.playKeyName());
+			case BOTH -> Component.translatable("easymine.screen.hint.both", RoutePlayer.playKeyName());
+		};
 	}
 
 	private static Component repeatLabel() {
@@ -193,7 +212,7 @@ public final class EasyMineScreen extends Screen {
 			graphics.text(font, Component.literal((selected ? "● " : "") + label), x, rowY,
 					selected ? 0xFF55FF55 : 0xFFFFFFFF);
 		}
-		graphics.text(font, Component.translatable("easymine.screen.hint"), x, top + PANEL_HEIGHT - 12, 0xFFAAAAAA);
+		graphics.text(font, hintLabel(), x, top + PANEL_HEIGHT - 12, 0xFFAAAAAA);
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 	}
 }

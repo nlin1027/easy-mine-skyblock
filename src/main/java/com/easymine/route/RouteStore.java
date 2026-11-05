@@ -38,7 +38,8 @@ import net.fabricmc.loader.api.FabricLoader;
  * { "version": 1, "name": "Mithril lane", "createdAt": "...", "lengthTicks": 240,
  *   "startYaw": 90.0, "startPitch": 12.5,   (optional: camera angle at the start; playback restores it every loop)
  *   "events": [ { "tick": 0, "type": "key", "code": 87, "down": true },
- *               { "tick": 3, "type": "look", "yaw": 1.5, "pitch": -0.25 } ] }
+ *               { "tick": 3, "frac": 0.57, "type": "look", "yaw": 1.5, "pitch": -0.25 } ] }
+ *   (look events carry an optional sub-tick "frac"; several are recorded per tick for smoother playback)
  * }</pre>
  */
 public final class RouteStore {
@@ -138,6 +139,9 @@ public final class RouteStore {
 			entry.addProperty("tick", event.tick());
 			entry.addProperty("type", event.type().name().toLowerCase(Locale.ROOT));
 			if (event.type() == Route.Type.LOOK) {
+				if (event.frac() != 0) {
+					entry.addProperty("frac", event.frac());
+				}
 				entry.addProperty("yaw", event.yaw());
 				entry.addProperty("pitch", event.pitch());
 			} else {
@@ -186,10 +190,11 @@ public final class RouteStore {
 			events.add(switch (type) {
 				case KEY -> Route.Event.key(tick, entry.get("code").getAsInt(), entry.get("down").getAsBoolean());
 				case MOUSE -> Route.Event.mouse(tick, entry.get("code").getAsInt(), entry.get("down").getAsBoolean());
-				case LOOK -> Route.Event.look(tick, entry.get("yaw").getAsFloat(), entry.get("pitch").getAsFloat());
+				case LOOK -> Route.Event.look(tick, entry.has("frac") ? entry.get("frac").getAsFloat() : 0f,
+						entry.get("yaw").getAsFloat(), entry.get("pitch").getAsFloat());
 			});
 		}
-		events.sort(Comparator.comparingInt(Route.Event::tick));
+		events.sort(Comparator.comparingDouble(Route.Event::time));
 		float startYaw = json.has("startYaw") ? json.get("startYaw").getAsFloat() : Float.NaN;
 		float startPitch = json.has("startPitch") ? json.get("startPitch").getAsFloat() : Float.NaN;
 		return new Route(id, json.get("name").getAsString(), createdAt, lengthTicks, startYaw, startPitch, events);

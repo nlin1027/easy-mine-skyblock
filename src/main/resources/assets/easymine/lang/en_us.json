@@ -1,6 +1,7 @@
 {
   "key.category.easymine.main": "Easy Mine",
   "key.easymine.toggle_recording": "Start/Stop Recording",
+  "key.easymine.toggle_playback": "Play/Pause Route",
 
   "easymine.button.open": "EM",
   "easymine.button.stop": "Stop",
@@ -11,7 +12,7 @@
   "easymine.command.help.stop": "/em stop - stop recording, or deselect the playing route",
   "easymine.command.help.status": "/em status - show recording and playback state",
   "easymine.command.help.list": "/em list - list saved routes",
-  "easymine.command.help.select": "/em select <name> - select a route (hold left click to play)",
+  "easymine.command.help.select": "/em select <name> - select a route (hold left click or use the play/pause key)",
   "easymine.command.help.deselect": "/em deselect - deselect the current route",
   "easymine.command.help.delete": "/em delete <name> - delete a saved route",
   "easymine.command.stopped": "Route playback stopped.",
@@ -31,7 +32,10 @@
   "easymine.play.deselected": "Deselected route: %s",
   "easymine.play.empty": "That route is empty.",
   "easymine.play.finished": "Route finished: %s",
-  "easymine.play.selected": "Selected route: %s. Hold left click to play.",
+  "easymine.play.selected": "Selected route: %s. Start it with left click or the play/pause key.",
+  "easymine.play.none_selected": "Select a route first.",
+  "easymine.play.resumed": "Playing: %s",
+  "easymine.play.paused": "Paused: %s",
 
   "easymine.record.error.already_recording": "Already recording \"%s\".",
   "easymine.record.error.name_empty": "Enter a route name first.",
@@ -56,5 +60,11 @@
   "easymine.screen.delete": "Delete",
   "easymine.screen.repeat_on": "Repeat: on",
   "easymine.screen.repeat_off": "Repeat: off",
-  "easymine.screen.hint": "Hold left click to play the selected route"
+  "easymine.screen.play_mode": "Play with: %s",
+  "easymine.screen.play_mode.hold": "Hold left click",
+  "easymine.screen.play_mode.keybind": "Keybind",
+  "easymine.screen.play_mode.both": "Both",
+  "easymine.screen.hint.hold": "Hold left click to play the route",
+  "easymine.screen.hint.keybind": "Press %s to play/pause the route",
+  "easymine.screen.hint.both": "Hold left click or press %s to play"
 }

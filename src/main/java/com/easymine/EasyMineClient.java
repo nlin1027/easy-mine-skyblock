@@ -16,6 +16,7 @@ public final class EasyMineClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		Settings.load();
 		EasyMineCommand.register();
 		InventoryButtons.register();
 		Recorder.register();
