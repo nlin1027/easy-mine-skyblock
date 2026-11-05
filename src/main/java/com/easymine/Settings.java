@@ -43,6 +43,7 @@ public final class Settings {
 	}
 
 	private static PlayMode playMode = PlayMode.HOLD;
+	private static boolean backgroundPlay = true;
 
 	private Settings() {
 	}
@@ -60,6 +61,19 @@ public final class Settings {
 		save();
 	}
 
+	/**
+	 * Whether a route started with the play/pause key keeps playing while the game window is not focused (alt-tabbed or
+	 * minimized), instead of Minecraft's "pause on lost focus" opening the pause menu and stopping it.
+	 */
+	public static boolean backgroundPlay() {
+		return backgroundPlay;
+	}
+
+	public static void setBackgroundPlay(boolean value) {
+		backgroundPlay = value;
+		save();
+	}
+
 	public static void load() {
 		Path file = file();
 		if (!Files.isRegularFile(file)) {
@@ -70,6 +84,9 @@ public final class Settings {
 			if (json.has("playMode")) {
 				playMode = PlayMode.valueOf(json.get("playMode").getAsString().toUpperCase(Locale.ROOT));
 			}
+			if (json.has("backgroundPlay")) {
+				backgroundPlay = json.get("backgroundPlay").getAsBoolean();
+			}
 		} catch (IOException | RuntimeException e) {
 			LOGGER.warn("Could not read settings, using defaults: {}", e.toString());
 		}
@@ -78,6 +95,7 @@ public final class Settings {
 	private static void save() {
 		JsonObject json = new JsonObject();
 		json.addProperty("playMode", playMode.name().toLowerCase(Locale.ROOT));
+		json.addProperty("backgroundPlay", backgroundPlay);
 		try {
 			Files.createDirectories(file().getParent());
 			try (Writer writer = Files.newBufferedWriter(file(), StandardCharsets.UTF_8)) {

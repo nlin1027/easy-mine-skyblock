@@ -29,6 +29,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 
+import net.minecraft.resources.Identifier;
+
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
@@ -37,6 +39,8 @@ import net.fabricmc.loader.api.FabricLoader;
  * <pre>{@code
  * { "version": 1, "name": "Mithril lane", "createdAt": "...", "lengthTicks": 240,
  *   "startYaw": 90.0, "startPitch": 12.5,   (optional: camera angle at the start; playback restores it every loop)
+ *   "standOn": "minecraft:gold_block", "standOnCheck": "start",   (optional: only play while standing on this block;
+ *                                                                  "start" checks once per loop, "always" every tick)
  *   "events": [ { "tick": 0, "type": "key", "code": 87, "down": true },
  *               { "tick": 3, "frac": 0.57, "type": "look", "yaw": 1.5, "pitch": -0.25 } ] }
  *   (look events carry an optional sub-tick "frac"; several are recorded per tick for smoother playback)
@@ -118,6 +122,11 @@ public final class RouteStore {
 		return null;
 	}
 
+	/** Rewrites an existing route's file, used when one of its settings (such as the stand-on block) changes. */
+	public static void update(Route route) throws IOException {
+		write(route);
+	}
+
 	public static void delete(Route route) throws IOException {
 		Files.deleteIfExists(directory().resolve(route.id() + EXTENSION));
 	}
@@ -131,6 +140,10 @@ public final class RouteStore {
 		if (route.hasStartLook()) {
 			json.addProperty("startYaw", route.startYaw());
 			json.addProperty("startPitch", route.startPitch());
+		}
+		if (route.standOn() != null) {
+			json.addProperty("standOn", route.standOn().toString());
+			json.addProperty("standOnCheck", route.standOnCheck().name().toLowerCase(Locale.ROOT));
 		}
 
 		JsonArray events = new JsonArray();
@@ -197,6 +210,11 @@ public final class RouteStore {
 		events.sort(Comparator.comparingDouble(Route.Event::time));
 		float startYaw = json.has("startYaw") ? json.get("startYaw").getAsFloat() : Float.NaN;
 		float startPitch = json.has("startPitch") ? json.get("startPitch").getAsFloat() : Float.NaN;
-		return new Route(id, json.get("name").getAsString(), createdAt, lengthTicks, startYaw, startPitch, events);
+		Identifier standOn = json.has("standOn") ? Identifier.tryParse(json.get("standOn").getAsString()) : null;
+		Route.BlockCheck check = json.has("standOnCheck")
+				? Route.BlockCheck.valueOf(json.get("standOnCheck").getAsString().toUpperCase(Locale.ROOT))
+				: Route.BlockCheck.START;
+		return new Route(id, json.get("name").getAsString(), createdAt, lengthTicks, startYaw, startPitch, events,
+				standOn, check);
 	}
 }

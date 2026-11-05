@@ -7,18 +7,25 @@ import java.util.concurrent.CompletableFuture;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import org.jspecify.annotations.Nullable;
+
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 
 import com.easymine.gui.EasyMineScreen;
+import com.easymine.route.BlockGate;
 import com.easymine.route.Recorder;
 import com.easymine.route.Route;
 import com.easymine.route.RoutePlayer;
@@ -26,7 +33,7 @@ import com.easymine.route.RouteStore;
 
 /** The client-side /em command. Works anywhere, not only in SkyBlock. */
 public final class EasyMineCommand {
-	private static final String[] HELP_KEYS = {"title", "open", "record", "stop", "status", "list", "select", "deselect", "delete"};
+	private static final String[] HELP_KEYS = {"title", "open", "record", "stop", "status", "list", "select", "deselect", "delete", "block"};
 
 	private EasyMineCommand() {
 	}
@@ -91,8 +98,12 @@ public final class EasyMineCommand {
 				return 0;
 			}
 			for (Route route : routes) {
-				ctx.getSource().sendFeedback(Component.translatable("easymine.command.list.entry",
-						route.name(), Route.formatDuration(route.lengthTicks()), route.inputCount()));
+				ctx.getSource().sendFeedback(route.standOn() == null
+						? Component.translatable("easymine.command.list.entry",
+								route.name(), Route.formatDuration(route.lengthTicks()), route.inputCount())
+						: Component.translatable("easymine.command.list.entry_block",
+								route.name(), Route.formatDuration(route.lengthTicks()), route.inputCount(),
+								BlockGate.name(route.standOn())));
 			}
 			return routes.size();
 		}));
@@ -127,7 +138,96 @@ public final class EasyMineCommand {
 							ctx.getSource().sendFeedback(Component.translatable("easymine.command.deleted", route.name()));
 							return 1;
 						})));
+		root.then(buildBlockCommand());
 		dispatcher.register(root);
+	}
+
+	/**
+	 * {@code /em block here|set|clear|check ...}: only play a route while standing on a block. The route name is always the
+	 * last argument so it can contain spaces.
+	 */
+	private static LiteralArgumentBuilder<FabricClientCommandSource> buildBlockCommand() {
+		LiteralArgumentBuilder<FabricClientCommandSource> block = ClientCommands.literal("block");
+		block.then(ClientCommands.literal("here").then(routeArgument().executes(ctx -> {
+			Route route = requireRoute(ctx);
+			if (route == null) {
+				return 0;
+			}
+			Identifier here = BlockGate.standingOn(Minecraft.getInstance().player);
+			if (here == null) {
+				ctx.getSource().sendError(Component.translatable("easymine.block.not_grounded"));
+				return 0;
+			}
+			return setBlock(ctx, route, here, route.standOnCheck());
+		})));
+		block.then(ClientCommands.literal("set")
+				.then(ClientCommands.argument("block", StringArgumentType.word())
+						.suggests((ctx, builder) -> suggestBlocks(builder))
+						.then(routeArgument().executes(ctx -> {
+							Route route = requireRoute(ctx);
+							if (route == null) {
+								return 0;
+							}
+							String text = StringArgumentType.getString(ctx, "block");
+							Identifier id = BlockGate.parse(text);
+							if (id == null) {
+								ctx.getSource().sendError(Component.translatable("easymine.block.unknown_block", text));
+								return 0;
+							}
+							return setBlock(ctx, route, id, route.standOnCheck());
+						}))));
+		block.then(ClientCommands.literal("clear").then(routeArgument().executes(ctx -> {
+			Route route = requireRoute(ctx);
+			return route == null ? 0 : setBlock(ctx, route, null, route.standOnCheck());
+		})));
+		LiteralArgumentBuilder<FabricClientCommandSource> check = ClientCommands.literal("check");
+		for (Route.BlockCheck mode : Route.BlockCheck.values()) {
+			check.then(ClientCommands.literal(mode.name().toLowerCase(Locale.ROOT)).then(routeArgument().executes(ctx -> {
+				Route route = requireRoute(ctx);
+				if (route == null) {
+					return 0;
+				}
+				if (route.standOn() == null) {
+					ctx.getSource().sendError(Component.translatable("easymine.block.no_block_set", route.name()));
+					return 0;
+				}
+				return setBlock(ctx, route, route.standOn(), mode);
+			})));
+		}
+		block.then(check);
+		return block;
+	}
+
+	private static RequiredArgumentBuilder<FabricClientCommandSource, String> routeArgument() {
+		return ClientCommands.argument("name", StringArgumentType.greedyString()).suggests((ctx, builder) -> suggestNames(builder));
+	}
+
+	private static int setBlock(CommandContext<FabricClientCommandSource> ctx, Route route, @Nullable Identifier block,
+			Route.BlockCheck check) {
+		try {
+			Route updated = BlockGate.configure(route, block, check);
+			ctx.getSource().sendFeedback(updated.standOn() == null
+					? Component.translatable("easymine.block.cleared", updated.name())
+					: Component.translatable("easymine.block.saved", updated.name(), BlockGate.name(updated.standOn()),
+							Component.translatable(check == Route.BlockCheck.ALWAYS
+									? "easymine.block.check_always.short" : "easymine.block.check_start.short")));
+			return 1;
+		} catch (IOException e) {
+			ctx.getSource().sendError(Component.translatable("easymine.block.save_failed", route.name()));
+			return 0;
+		}
+	}
+
+	private static CompletableFuture<Suggestions> suggestBlocks(SuggestionsBuilder builder) {
+		String typed = builder.getRemainingLowerCase();
+		for (Identifier id : BuiltInRegistries.BLOCK.keySet()) {
+			String full = id.toString();
+			String shown = "minecraft".equals(id.getNamespace()) ? id.getPath() : full;
+			if (full.startsWith(typed) || shown.startsWith(typed)) {
+				builder.suggest(shown);
+			}
+		}
+		return builder.buildFuture();
 	}
 
 	private static Route requireRoute(CommandContext<FabricClientCommandSource> ctx) {

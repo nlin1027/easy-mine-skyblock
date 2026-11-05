@@ -16,7 +16,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -40,9 +39,6 @@ public final class Recorder {
 
 	/** Hard cap so a forgotten recording does not grow forever: 30 minutes. */
 	public static final int MAX_TICKS = 30 * 60 * Route.TICKS_PER_SECOND;
-
-	private static final KeyMapping.Category CATEGORY =
-			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(EasyMineClient.MOD_ID, "main"));
 
 	/** Every GLFW keyboard key code worth polling (polling an unknown code makes GLFW log an error). */
 	private static final int[] KEY_CODES = buildKeyCodes();
@@ -91,7 +87,7 @@ public final class Recorder {
 
 	public static void register() {
 		toggleKey = KeyMappingHelper.registerKeyMapping(
-				new KeyMapping("key.easymine.toggle_recording", GLFW.GLFW_KEY_F8, CATEGORY));
+				new KeyMapping("key.easymine.toggle_recording", GLFW.GLFW_KEY_F8, EasyMineClient.KEY_CATEGORY));
 		ClientTickEvents.START_CLIENT_TICK.register(Recorder::onStartTick);
 		LevelRenderEvents.START_MAIN.register(context -> onFrame(Minecraft.getInstance()));
 	}
