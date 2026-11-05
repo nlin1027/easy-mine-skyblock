@@ -1,5 +1,8 @@
 package com.easymine;
 
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
+
 import net.fabricmc.api.ClientModInitializer;
 
 import com.easymine.command.EasyMineCommand;
@@ -13,6 +16,13 @@ import com.easymine.route.RoutePlayer;
  */
 public final class EasyMineClient implements ClientModInitializer {
 	public static final String MOD_ID = "easymine";
+
+	/**
+	 * The controls-screen category shared by all of this mod's key bindings. A category id may only be registered once
+	 * (a second registration throws), so it lives here instead of in each class that adds a key.
+	 */
+	public static final KeyMapping.Category KEY_CATEGORY =
+			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 
 	@Override
 	public void onInitializeClient() {

@@ -14,7 +14,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -50,9 +49,6 @@ public final class RoutePlayer {
 	/** How long the camera takes to ease back onto the route's angle. */
 	private static final long BLEND_NANOS = 300_000_000L;
 
-	private static final KeyMapping.Category CATEGORY =
-			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(EasyMineClient.MOD_ID, "main"));
-
 	private static @Nullable KeyMapping playKey;
 
 	private static @Nullable Route route;
@@ -86,7 +82,7 @@ public final class RoutePlayer {
 
 	public static void register() {
 		playKey = KeyMappingHelper.registerKeyMapping(
-				new KeyMapping("key.easymine.toggle_playback", GLFW.GLFW_KEY_F9, CATEGORY));
+				new KeyMapping("key.easymine.toggle_playback", GLFW.GLFW_KEY_F9, EasyMineClient.KEY_CATEGORY));
 		ClientTickEvents.START_CLIENT_TICK.register(RoutePlayer::onStartTick);
 		LevelRenderEvents.START_MAIN.register(context -> onFrame(Minecraft.getInstance()));
 	}
