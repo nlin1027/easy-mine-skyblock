@@ -5,15 +5,18 @@ import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 import com.easymine.Settings;
+import com.easymine.route.BlockGate;
 import com.easymine.route.Recorder;
 import com.easymine.route.Route;
 import com.easymine.route.RoutePlayer;
@@ -27,7 +30,7 @@ public final class EasyMineScreen extends Screen {
 	private static final int PANEL_WIDTH = 232;
 	private static final int ROWS_PER_PAGE = 5;
 	private static final int ROW_HEIGHT = 22;
-	private static final int PANEL_HEIGHT = 262;
+	private static final int PANEL_HEIGHT = 286;
 
 	private static int page;
 
@@ -86,6 +89,12 @@ public final class EasyMineScreen extends Screen {
 			Route route = routes.get(i);
 			int rowY = y + (i - first) * ROW_HEIGHT;
 			boolean selected = RoutePlayer.isSelected(route);
+			addRenderableWidget(Button.builder(blockButtonLabel(route), button -> RouteBlockScreen.open(route))
+					.bounds(x + inner - 136, rowY, 20, 20)
+					.tooltip(Tooltip.create(route.standOn() == null
+							? Component.translatable("easymine.screen.block.tooltip_none")
+							: Component.translatable("easymine.screen.block.tooltip", BlockGate.name(route.standOn()))))
+					.build());
 			addRenderableWidget(Button.builder(
 					Component.translatable(selected ? "easymine.screen.deselect" : "easymine.screen.select"),
 					button -> {
@@ -117,8 +126,25 @@ public final class EasyMineScreen extends Screen {
 		addRenderableWidget(Button.builder(playModeLabel(), button -> {
 			Settings.setPlayMode(Settings.playMode().next());
 			RoutePlayer.onPlayModeChanged();
-			button.setMessage(playModeLabel());
+			build();
 		}).bounds(x, footerY + 24, inner, 20).build());
+		// Background play needs the play/pause key: left click cannot be held while the window is unfocused.
+		Button background = Button.builder(backgroundLabel(), button -> {
+			Settings.setBackgroundPlay(!Settings.backgroundPlay());
+			button.setMessage(backgroundLabel());
+		}).bounds(x, footerY + 48, inner, 20)
+				.tooltip(Tooltip.create(Component.translatable("easymine.screen.background.tooltip"))).build();
+		background.active = Settings.playMode().allowsKeybind();
+		addRenderableWidget(background);
+	}
+
+	/** "B" opens the route's stand-on block settings; it is green when the route is restricted to a block. */
+	private static Component blockButtonLabel(Route route) {
+		return Component.literal("B").withStyle(route.standOn() != null ? ChatFormatting.GREEN : ChatFormatting.WHITE);
+	}
+
+	private static Component backgroundLabel() {
+		return Component.translatable(Settings.backgroundPlay() ? "easymine.screen.background_on" : "easymine.screen.background_off");
 	}
 
 	private static Component playModeLabel() {
@@ -207,7 +233,7 @@ public final class EasyMineScreen extends Screen {
 		for (int i = first; i < Math.min(routes.size(), first + ROWS_PER_PAGE); i++) {
 			Route route = routes.get(i);
 			boolean selected = RoutePlayer.isSelected(route);
-			String label = font.plainSubstrByWidth(route.name(), 96);
+			String label = font.plainSubstrByWidth(route.name(), 76);
 			int rowY = rowsTop + (i - first) * ROW_HEIGHT + 6;
 			graphics.text(font, Component.literal((selected ? "● " : "") + label), x, rowY,
 					selected ? 0xFF55FF55 : 0xFFFFFFFF);

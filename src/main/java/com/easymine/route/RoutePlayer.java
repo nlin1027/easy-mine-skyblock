@@ -14,6 +14,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -43,13 +44,26 @@ import com.easymine.Settings;
  * angle (starting, resuming after a pause, or beginning a new loop) it eases there over {@link #BLEND_NANOS} instead of
  * snapping.
  *
- * <p>Everything stays on the client: only the key bindings and the player's own rotation are touched.
+ * <p><b>Background play.</b> A route started with the play/pause key keeps running while the window is unfocused, see
+ * {@link #syncBackgroundPlay}. Holding left click cannot do this, because the button is released when focus is lost.
+ *
+ * <p>Everything stays on the client: only the key bindings, the player's own rotation and (temporarily, while a route
+ * runs) the client's own "pause on lost focus" option are touched.
  */
 public final class RoutePlayer {
 	/** How long the camera takes to ease back onto the route's angle. */
 	private static final long BLEND_NANOS = 300_000_000L;
 
 	private static @Nullable KeyMapping playKey;
+
+	/** True while this class has switched {@code pauseOnLostFocus} off; {@link #savedPauseOnLostFocus} is the value to restore. */
+	private static boolean focusPauseOverridden;
+	private static boolean savedPauseOnLostFocus;
+
+	/** Whether the route's stand-on block was matched the last time it could be checked (kept while airborne). */
+	private static boolean gateOpen;
+	/** True once the "stand on X" message was shown for the current wait, so it is not repeated every tick. */
+	private static boolean gateNotified;
 
 	private static @Nullable Route route;
 	private static int stepTick;
@@ -111,6 +125,31 @@ public final class RoutePlayer {
 	}
 
 	private static void onStartTick(Minecraft minecraft) {
+		tickPlayback(minecraft);
+		syncBackgroundPlay(minecraft);
+	}
+
+	/**
+	 * Keeps a key-started route running while the window is not focused. Minecraft opens the pause menu half a second after
+	 * focus is lost when {@code pauseOnLostFocus} is on, and an open screen stops playback. So that option is switched off
+	 * only while a route is actually running, and put back the moment it is not (route stopped or finished, a screen opened,
+	 * or the world left), which also means it is never left off while any settings screen could save it.
+	 *
+	 * <p>Only a key-started route qualifies: the hold-left-click gate cannot be held while the window is unfocused.
+	 */
+	private static void syncBackgroundPlay(Minecraft minecraft) {
+		boolean wanted = route != null && active && keyPlaying && Settings.backgroundPlay();
+		if (wanted && !focusPauseOverridden) {
+			savedPauseOnLostFocus = minecraft.options.pauseOnLostFocus;
+			minecraft.options.pauseOnLostFocus = false;
+			focusPauseOverridden = true;
+		} else if (!wanted && focusPauseOverridden) {
+			minecraft.options.pauseOnLostFocus = savedPauseOnLostFocus;
+			focusPauseOverridden = false;
+		}
+	}
+
+	private static void tickPlayback(Minecraft minecraft) {
 		if (playKey != null) {
 			while (playKey.consumeClick()) {
 				togglePlayback();
@@ -135,12 +174,27 @@ public final class RoutePlayer {
 		}
 
 		if (!wantsPlay(minecraft)) {
+			gateNotified = false;
 			if (active) {
 				active = false;
 				releaseKeys();
 			}
 			return;
 		}
+		if (!blockGateOpen(player)) {
+			// Not on the route's block: hold still and wait. Playback picks up by itself once the player is back on it.
+			if (active) {
+				active = false;
+				releaseKeys();
+			}
+			Route waiting = route;
+			if (!gateNotified && waiting != null && waiting.standOn() != null) {
+				gateNotified = true;
+				overlay(Component.translatable("easymine.play.wrong_block", BlockGate.name(waiting.standOn()), waiting.name()));
+			}
+			return;
+		}
+		gateNotified = false;
 		if (!active) {
 			active = true;
 			if (stepTick == 0) {
@@ -152,6 +206,38 @@ public final class RoutePlayer {
 		}
 
 		advance(minecraft, player);
+	}
+
+	/**
+	 * Whether the route's stand-on block requirement (if it has one) is met right now. In {@code START} mode it is only
+	 * checked at the beginning of a loop; in {@code ALWAYS} mode every tick. While airborne no block supports the player, so
+	 * {@code ALWAYS} keeps its last answer (a jump must not pause the route) and {@code START} simply waits to land.
+	 */
+	private static boolean blockGateOpen(LocalPlayer player) {
+		Route playing = route;
+		Identifier required = playing == null ? null : playing.standOn();
+		if (required == null) {
+			return true;
+		}
+		boolean always = playing.standOnCheck() == Route.BlockCheck.ALWAYS;
+		if (!always && stepTick != 0) {
+			return true;
+		}
+		Identifier standing = BlockGate.standingOn(player);
+		if (standing == null) {
+			return always && gateOpen;
+		}
+		gateOpen = standing.equals(required);
+		return gateOpen;
+	}
+
+	/** A selected route's settings were changed (for example its stand-on block): use the new version from now on. */
+	public static void onRouteChanged(Route updated) {
+		if (route != null && route.id().equals(updated.id())) {
+			route = updated;
+			gateOpen = false;
+			gateNotified = false;
+		}
 	}
 
 	/** Play/pause key pressed. */
@@ -380,6 +466,8 @@ public final class RoutePlayer {
 		buildCurve(toSelect);
 		blending = false;
 		keyPlaying = false;
+		gateOpen = false;
+		gateNotified = false;
 		stepTick = 0;
 		eventCursor = 0;
 		desired.clear();

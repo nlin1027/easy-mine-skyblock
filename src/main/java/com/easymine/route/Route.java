@@ -4,23 +4,53 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.resources.Identifier;
+
 /**
  * A saved run of input: every keyboard key, every mouse button and the camera, on a game-tick timeline (20 ticks/second).
  *
- * @param id          file name without {@code .json}
- * @param name        display name
- * @param createdAt   when recording started
- * @param lengthTicks how long the route lasts
- * @param startYaw    exact camera yaw when recording began ({@link Float#NaN} for routes saved before this was stored)
- * @param startPitch  exact camera pitch when recording began ({@link Float#NaN} if unknown)
- * @param events      in tick order
+ * @param id             file name without {@code .json}
+ * @param name           display name
+ * @param createdAt      when recording started
+ * @param lengthTicks    how long the route lasts
+ * @param startYaw       exact camera yaw when recording began ({@link Float#NaN} for routes saved before this was stored)
+ * @param startPitch     exact camera pitch when recording began ({@link Float#NaN} if unknown)
+ * @param events         in tick order
+ * @param standOn        the block the player must be standing on for the route to play, or null to play anywhere
+ * @param standOnCheck   when {@code standOn} is checked (ignored if {@code standOn} is null)
  */
 public record Route(String id, String name, Instant createdAt, int lengthTicks, float startYaw, float startPitch,
-		List<Event> events) {
+		List<Event> events, @Nullable Identifier standOn, BlockCheck standOnCheck) {
 	public static final int TICKS_PER_SECOND = 20;
+
+	/** When the stand-on block is checked. */
+	public enum BlockCheck {
+		/** Only when the route starts or loops back to its beginning; once running it plays on, wherever it walks. */
+		START,
+		/** Every tick: the route pauses whenever the player is not on the block. */
+		ALWAYS;
+
+		public BlockCheck next() {
+			return this == START ? ALWAYS : START;
+		}
+	}
 
 	public Route {
 		events = List.copyOf(events);
+	}
+
+	/** A route with no stand-on block. */
+	public Route(String id, String name, Instant createdAt, int lengthTicks, float startYaw, float startPitch,
+			List<Event> events) {
+		this(id, name, createdAt, lengthTicks, startYaw, startPitch, events, null, BlockCheck.START);
+	}
+
+	/** The same route with a different stand-on setting ({@code block} null means play anywhere). */
+	public Route withStandOn(@Nullable Identifier block, BlockCheck check) {
+		return new Route(this.id, this.name, this.createdAt, this.lengthTicks, this.startYaw, this.startPitch, this.events,
+				block, check);
 	}
 
 	/** False for routes recorded before the starting camera angle was saved; playback then keeps the current angle. */
